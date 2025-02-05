@@ -1,3 +1,10 @@
+#include <SDL3/SDL_error.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_oldnames.h>
+#include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_video.h>
 #include <ffmpeg4.4/libswscale/swscale.h>
 #include <libavcodec/avcodec.h>
 #include <libavcodec/codec_id.h>
@@ -7,10 +14,12 @@
 #include <libavutil/avutil.h>
 #include <libavutil/error.h>
 #include <libavutil/frame.h>
+#include <SDL3/SDL.h>
+#include <libavutil/pixfmt.h>
 #include <stdio.h>
+#include <string.h>
 
 int main(int argc, char *argv[]) {
-  printf("Running with %d arguments\n", argc);
   // ensure that a file is passed into the program
   if (argc < 2) {
     char* program = argv[0];
@@ -51,6 +60,32 @@ int main(int argc, char *argv[]) {
     printf("Error: file must be a video file\n");
     return -1;
   }
+  
+  // initialize SDL
+  if (!SDL_Init(SDL_INIT_VIDEO)) {
+    printf("Error: %s\n", SDL_GetError());
+    return -1;
+  }
+
+  // create SDL window
+  SDL_Window* window = SDL_CreateWindow("visage", codecpar->width, codecpar->height,
+                                        SDL_WINDOW_RESIZABLE);
+  if (!window) {
+    printf("Error: %s\n", SDL_GetError());
+    return -1;
+  }
+
+  // initialize SDL renderer
+  SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
+  if (!renderer) {
+    printf("Error: %s\n", SDL_GetError());
+    return -1;
+  }
+
+  // create texture to render the video
+  SDL_Texture* video_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV,
+                                                 SDL_TEXTUREACCESS_STREAMING,
+                                                 codecpar->width, codecpar->height);
 
   // initialize the SWS conversion context
   struct SwsContext* sws_ctx = sws_getContext(codecpar->width, codecpar->height,
@@ -110,8 +145,20 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  // start SDl event loop
+  SDL_Event event;
+
   // read frames from the stream
   while (av_read_frame(format_ctx, packet) >= 0) {
+    // poll SDL events
+    SDL_PollEvent(&event);
+
+    // handle SDL events
+    switch (event.type) {
+    case SDL_EVENT_QUIT:
+      return 0;
+    }
+      
     // ensure that it is the video frame
     if (packet->stream_index != video_idx) continue;
 
@@ -125,9 +172,29 @@ int main(int argc, char *argv[]) {
 
     // receive frame from the decoder
     while (avcodec_receive_frame(codec_ctx, frame) >= 0) {
+      // poll SDL events
+      SDL_PollEvent(&event);
+
+      // handle SDL events
+      switch (event.type) {
+      case SDL_EVENT_QUIT:
+        goto cleanup;
+      }
+      
       // convert the frame into the YUV format
       sws_scale(sws_ctx, (const uint8_t *const *) frame->data, frame->linesize,
                 0, frame->height, scaled_frame->data, scaled_frame->linesize);
+
+      // update texture with new frame data
+      SDL_UpdateYUVTexture(video_texture, NULL,
+                           scaled_frame->data[0], scaled_frame->linesize[0],
+                           scaled_frame->data[1], scaled_frame->linesize[1],
+                           scaled_frame->data[2], scaled_frame->linesize[2]);
+
+      // clear current renderer and copy new texture
+      SDL_RenderClear(renderer);
+      SDL_RenderTexture(renderer, video_texture, NULL, NULL);
+      SDL_RenderPresent(renderer);
 
       // get scaled frame data
       printf("Frame sample rate: %d\n", scaled_frame->sample_rate);
@@ -135,11 +202,14 @@ int main(int argc, char *argv[]) {
   }
 
   // cleanup everything
+ cleanup:
   av_frame_free(&scaled_frame);
   av_frame_free(&frame);
   av_packet_free(&packet);
   avcodec_free_context(&codec_ctx);
   sws_freeContext(sws_ctx);
+  SDL_DestroyRenderer(renderer);
+  SDL_Quit();
   avformat_free_context(format_ctx);
 
   return 0;
