@@ -194,14 +194,14 @@ int visage_process_video(VisageVideo* video) {
  }
 
 /** Frees the video context. */
-void visage_free_video(VisageVideo **video) {
+void visage_free_video(VisageVideo** video) {
     if (!*video) return;
     
     avcodec_free_context(&(*video)->codec_ctx);
     sws_freeContext((*video)->sws_ctx);
     visage_free_all_frames((*video)->frames);
-    av_free(*video);
     pthread_mutex_destroy(&(*video)->frame_mutex);
+    av_free(*video);
     *video = NULL;
 } 
 
