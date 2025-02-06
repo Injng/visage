@@ -1,0 +1,34 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-Iinclude",
+      "-o",
+      "visage.out",
+      "src/main.c"
+    ],
+    "directory": "/home/lnjng/Projects/dev/visage",
+    "file": "/home/lnjng/Projects/dev/visage/src/main.c",
+    "output": "/home/lnjng/Projects/dev/visage/visage.out"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-Iinclude",
+      "-o",
+      "visage.out",
+      "src/video.c"
+    ],
+    "directory": "/home/lnjng/Projects/dev/visage",
+    "file": "/home/lnjng/Projects/dev/visage/src/video.c",
+    "output": "/home/lnjng/Projects/dev/visage/visage.out"
+  }
+]
